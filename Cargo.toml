@@ -1,0 +1,13 @@
+[package]
+name = "vm"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+name = "assembler"
+path = "src/assembler.rs"
+test = false
+
+[[bin]]
+name = "vm"
+path = "src/vm.rs"

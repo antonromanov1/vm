@@ -1,0 +1,55 @@
+Instructions:
+  - sig: mov v1:out:u32, v2:in:u32
+    title: move
+    description: Read data from one register and write it to another register
+    acc: none
+    format: [opcode_v1_8_v2_8]
+
+  - sig: movi v1:in:u32, imm:u32
+    title: move immediate value
+    description: Write immediate value to register
+    acc: none
+    format: [opcode_v1_8_imm_32]
+
+  - sig: ldai imm:u32
+    title: load immediate to accumulator
+    description: Write immediate value to accumulator
+    acc: out:u32
+    format: [opcode_imm_32]
+
+  - sig: lda v1:in:u32
+    title: load register to accumulator
+    description: Read data from register and write it to accumulator
+    acc: out:u32
+    format: [opcode_v1_8]
+
+  - sig: sta v1:out:u32
+    title: store accumulator in register
+    description: Read data from accumulator and write it to register
+    acc: in:u32
+    format: [opcode_v1_8]
+
+  - sig: add v1:in:u32
+    title: add register and accumulator
+    description: Read data from register, from accumulator, add this values and write the result
+      to accumulator
+    acc: inout:u32
+    format: [opcode_v1_8]
+
+  - sig: dec v1:inout:u32
+    title: decrement register
+    description: Decrement register by 1
+    acc: none
+    format: [opcode_v1_8]
+
+  - sig: bne v1:in:u32, v2:in:u32, imm:u32
+    title: branch if not equal
+    description: Read data from registers and if the values are equal then jump to immediate value
+    acc: none
+    format: [opcode_v1_8_v2_8_imm_32]
+
+  - sig: print
+    title: print accumulator
+    description: Read integer from accumulator and write it to the standard output
+    acc: in:u32
+    format: [opcode]

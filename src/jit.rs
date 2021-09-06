@@ -102,6 +102,36 @@ struct BlockNode {
     last_inst: Option<Inst>,
 }
 
+/// Iterate over blocks in layout order. See `Layout::blocks()`.
+pub struct Blocks<'f> {
+    layout: &'f Layout,
+    next: Option<Block>,
+}
+
+impl<'f> Iterator for Blocks<'f> {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Block> {
+        match self.next {
+            Some(block) => {
+                self.next = self.layout.next_block(block);
+                Some(block)
+            }
+            None => None,
+        }
+    }
+}
+
+/// Use a layout reference in a for loop.
+impl<'f> IntoIterator for &'f Layout {
+    type Item = Block;
+    type IntoIter = Blocks<'f>;
+
+    fn into_iter(self) -> Blocks<'f> {
+        self.blocks()
+    }
+}
+
 type Inst = u32;
 
 #[derive(Default)]
@@ -198,6 +228,19 @@ impl Layout {
             block_node.last_inst = inst.into();
         }
     }
+
+    /// Return an iterator over all blocks in layout order.
+    pub fn blocks(&self) -> Blocks {
+        Blocks {
+            layout: self,
+            next: self.first_block,
+        }
+    }
+
+    /// Get the block following `block` in the layout order.
+    pub fn next_block(&self, block: Block) -> Option<Block> {
+        self.blocks[block].next
+    }
 }
 
 #[cfg(test)]
@@ -206,16 +249,26 @@ mod tests {
 
     #[test]
     fn layout() {
+        // Create a Layout object
         let mut layout = Layout::new();
         let block0 = 0;
         let block1 = 1;
         let inst = 0;
+
+        // Append 2 blocks and 1 instruction to the first block
         layout.append_block(block0);
         layout.append_inst(inst, block0);
         layout.append_block(block1);
+
+        // Check the presence of blocks
         assert!(layout.is_block_inserted(block0));
         assert!(layout.is_block_inserted(block1));
         assert!(!layout.is_block_inserted(block1 + 1));
+
+        // Check the block's layout
+        assert_eq!(layout.next_block(block0), Some(block1));
+
+        // Check instruction's block reference
         assert_eq!(layout.inst_block(inst), Some(block0));
     }
 }

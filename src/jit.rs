@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
@@ -98,6 +99,7 @@ type Block = u32;
 struct BlockNode {
     prev: Option<Block>,
     next: Option<Block>,
+    first_phi: Option<Inst>,
     first_inst: Option<Inst>,
     last_inst: Option<Inst>,
 }
@@ -243,9 +245,103 @@ impl Layout {
     }
 }
 
+enum Opcode {
+    Constant,
+    Add,
+    Sub,
+    Bne,
+    Phi,
+}
+
+enum InstData {
+    Constant {
+        opcode: Opcode,
+        value: u32,
+    },
+    Binary {
+        opcode: Opcode,
+        inputs: [Inst; 2],
+    },
+    Bne {
+        opcode: Opcode,
+        inputs: [Inst; 2],
+        succs: [Block; 2],
+    },
+    Phi {
+        opcode: Opcode,
+        inputs: Vec<Inst>,
+    },
+}
+
+impl InstData {
+    fn inputs(&self) -> Option<Vec<Inst>> {
+        match self {
+            Self::Constant { .. } => None,
+            Self::Binary { opcode, inputs } => Some(vec![inputs[0], inputs[1]]),
+            Self::Bne { opcode, inputs, .. } => Some(vec![inputs[0], inputs[1]]),
+            Self::Phi { opcode, inputs } => Some(inputs.clone()),
+        }
+    }
+}
+
+struct DataFlowGraph {
+    // Data about all of the instructions in the function, including opcodes and inputs. The
+    // instructions in this map are not in program order.
+    insts: HashMap<Inst, InstData>,
+
+    // Users of instructions
+    users: SecondaryMap<Inst, BTreeSet<Inst>>,
+}
+
+impl DataFlowGraph {
+    fn new() -> Self {
+        Self {
+            insts: HashMap::new(),
+            users: SecondaryMap::new(),
+        }
+    }
+
+    fn make_inst(&mut self, data: InstData) -> Inst {
+        let ret = (self.insts.len() + 1) as u32;
+        if let Some(inputs) = data.inputs() {
+            for input in inputs {
+                self.users[input].insert(ret);
+            }
+        }
+
+        self.insts.insert(ret, data);
+        ret
+    }
+}
+
+#[derive(Default)]
+struct CFGNode {
+    preds: BTreeSet<Block>,
+    succs: BTreeSet<Block>,
+}
+
+struct Function {
+    dfg: DataFlowGraph,
+    layout: Layout,
+    cfg: SecondaryMap<Block, CFGNode>,
+}
+
+impl Function {
+    fn new() -> Self {
+        Self {
+            dfg: DataFlowGraph::new(),
+            layout: Layout::new(),
+            cfg: SecondaryMap::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::jit::DataFlowGraph;
+    use crate::jit::InstData;
     use crate::jit::Layout;
+    use crate::jit::Opcode;
 
     #[test]
     fn layout() {
@@ -270,5 +366,34 @@ mod tests {
 
         // Check instruction's block reference
         assert_eq!(layout.inst_block(inst), Some(block0));
+    }
+
+    #[test]
+    fn data_flow_graph() {
+        let mut dfg = DataFlowGraph::new();
+
+        let const1_data = InstData::Constant {
+            opcode: Opcode::Constant,
+            value: 0,
+        };
+
+        let const2_data = InstData::Constant {
+            opcode: Opcode::Constant,
+            value: 1,
+        };
+
+        let const1 = dfg.make_inst(const1_data);
+        let const2 = dfg.make_inst(const2_data);
+
+        let add_data = InstData::Binary {
+            opcode: Opcode::Add,
+            inputs: [const1, const2],
+        };
+
+        let add = dfg.make_inst(add_data);
+
+        assert_eq!(const1, 1);
+        assert_eq!(const2, 2);
+        assert_eq!(add, 3);
     }
 }
